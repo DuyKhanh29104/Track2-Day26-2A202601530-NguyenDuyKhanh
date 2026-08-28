@@ -28,7 +28,7 @@ hardest to catch — section 3 below is about exactly that.*
   "mutation": { "target": "a2a:curriculum-analyst",  // "mcp:<server>" | "a2a:<peer>"
                 "op": "replace_act",       // one of 9 closed ops (arena/mutations.py)
                 "value": "learner:sv-0392" },
-  "trigger": { "on": "call_index", "gte": 2 }
+  "trigger": { "on": "call_index", "gte": 0 }
 }
 ```
 
@@ -142,16 +142,17 @@ returns `true`); `atk_03`'s `drift`-class card is held to the identical mechanic
 even though it is not literally named `replica_flip` (`validate_deck.py`'s `R5b` rule) — its
 `path_id` (`053195a5`) is also a real drift-set member.
 
-**`deck/lineup.json`** plays all 10 attacks, none of the 4 blanks, in this order:
+**`deck/lineup.json`** plays all 10 attacks, none of the 4 blanks, in this order. High-weight
+identity and faithless-peer pressure comes first so a short duel still exercises the A2A boundary:
 
 ```
-atk_05 (schema_bomb, cheap opener) → atk_01 (shadow) → atk_04 (poisoned_result) →
-atk_08 (forged_card) → atk_03 (drift) → atk_09 (faithless_peer) → atk_06 (header_spoof) →
-atk_02 (replica_flip) → atk_10 (identity/aud) → atk_07 (identity/act, CONTRACTS' own worked case, saved for last)
+atk_10 (identity/aud) → atk_07 (identity/act) → atk_09 (faithless_peer) →
+atk_06 (header_spoof) → atk_08 (forged_card) → atk_01 (shadow) →
+atk_05 (schema_bomb) → atk_03 (drift) → atk_04 (poisoned_result) → atk_02 (replica_flip)
 ```
 
-Layers alternate deliberately (MCP, MCP, MCP, A2A, MCP, A2A, gateway, gateway, A2A, A2A) so a
-defender who hardens against whatever landed last round is still exposed the next. **Benching
+The first three cards stress A2A identity/grounding before rotating through gateway and MCP
+pressure. **Benching
 all 4 blanks is this starter's own aggressive choice, not a rule** — trading an attack for a
 blank, and where in the order to place it, is exactly the strategic lever RULES.md's blank
 mechanic creates. Pull it if your own deck wants to bait a false positive instead.

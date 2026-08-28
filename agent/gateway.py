@@ -357,7 +357,10 @@ class Gateway:
         self._idempotency_keys: set[str] = set()
         self._round_spend: dict[int, int] = {}
 
-    _TARGET_KEYS: tuple[str, ...] = ("learner", "learner_id", "target", "subject")
+    _TARGET_KEYS: tuple[str, ...] = (
+        "learner", "learner_id", "target", "subject", "act",
+        "user", "student", "actor", "on_behalf_of",
+    )
     _INJECTION_MARKERS: tuple[str, ...] = (
         "ignore previous instruction", "ignore all previous", "disregard the above",
         "system override", "bỏ qua mọi hướng dẫn", "you must now", "instead, record",
@@ -399,6 +402,31 @@ class Gateway:
     def _is_injected(self, cmd: Command) -> bool:
         blob = " ".join(str(v) for v in cmd.args.values()).casefold()
         return any(marker in blob for marker in self._INJECTION_MARKERS)
+
+    def _boundary_violation(self, cmd: Command) -> str | None:
+        """Reject identity/delegation markers before routing can normalise them.
+
+        These checks deliberately apply to reads as well as writes.  A learner id
+        on a read is still an authority boundary (for example roster lookup), and
+        mutation metadata such as ``peer_unverified`` must never be allowed to
+        hitch-hike through an otherwise harmless MCP command.
+        """
+        act = str(getattr(self.ctx, "act", "")).casefold()
+        for key in self._TARGET_KEYS:
+            value = cmd.args.get(key)
+            if not isinstance(value, str):
+                continue
+            claimed = value.strip().casefold()
+            if claimed.startswith("learner:") and act and claimed != act:
+                return f"{key} identity {value!r} does not match ctx.act"
+
+        if cmd.args.get("peer_unverified"):
+            return "peer-supplied data is explicitly marked unverified"
+
+        headers = self._normalised_headers(cmd.headers)
+        if cmd.kind != "a2a" and "aud" in headers:
+            return "delegation audience header is invalid on a non-A2A command"
+        return None
 
     def _write_authorised(self, cmd: Command) -> tuple[bool, str | None]:
         spec = TOOL_SPECS.get((cmd.server, cmd.tool))
@@ -450,6 +478,10 @@ class Gateway:
         The four jobs below are ordered so cheap structural checks happen
         before cost estimation and ToolCall construction."""
         self._telemetry.decision_seen(cmd)
+
+        boundary_reason = self._boundary_violation(cmd)
+        if boundary_reason is not None:
+            return self._deny(cmd, boundary_reason, quarantine=bool(cmd.args.get("peer_unverified")))
 
         # ------------------------------------------------------------------
         # JOB 1 — ROUTE: is this the right SERVER/REPLICA for this command?
